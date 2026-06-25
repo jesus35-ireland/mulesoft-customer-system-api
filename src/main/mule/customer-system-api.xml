@@ -1,156 +1,387 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
-    <http:listener-config name="customer-system-api-httpListenerConfig">
-        <http:listener-connection host="0.0.0.0" port="8081" />
-    </http:listener-config>
-    <apikit:config name="customer-system-api-config" api="resource::38cd32ec-dbaf-4d31-bc6e-25087cbf3c52:customer-system-api:1.0.0:raml:zip:customer-system-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
-    <flow name="customer-system-api-main">
-        <http:listener config-ref="customer-system-api-httpListenerConfig" path="/api/*">
-            <http:response statusCode="#[vars.httpStatus default 200]">
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
-            </http:response>
-            <http:error-response statusCode="#[vars.httpStatus default 500]">
-                <http:body>#[payload]</http:body>
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
-            </http:error-response>
-        </http:listener>
-        <apikit:router config-ref="customer-system-api-config" />
-        <error-handler>
-            <on-error-propagate type="APIKIT:BAD_REQUEST">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+
+	xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
+	<configuration-properties
+		file="config-${env}.yaml" />
+	<http:listener-config
+		name="customer-system-api-httpListenerConfig">
+		<http:listener-connection host="0.0.0.0"
+			port="${http.port}" />
+	</http:listener-config>
+	<db:config name="Postgres_Config">
+		<db:generic-connection
+			url="jdbc:postgresql://${db.host}:${db.port}/${db.database}"
+			user="${db.user}" password="${db.password}"
+			driverClassName="org.postgresql.Driver" />
+	</db:config>
+	<apikit:config name="customer-system-api-config"
+		api="resource::38cd32ec-dbaf-4d31-bc6e-25087cbf3c52:customer-system-api:1.0.0:raml:zip:customer-system-api.raml"
+		outboundHeadersMapName="outboundHeaders"
+		httpStatusVarName="httpStatus" />
+	<flow name="customer-system-api-main">
+		<http:listener
+			config-ref="customer-system-api-httpListenerConfig" path="/api/*">
+			<http:response
+				statusCode="#[vars.httpStatus default 200]">
+				<http:headers>#[vars.outboundHeaders default {}]</http:headers>
+			</http:response>
+			<http:error-response
+				statusCode="#[vars.httpStatus default 500]">
+				<http:body>#[payload]</http:body>
+				<http:headers>#[vars.outboundHeaders default {}]</http:headers>
+			</http:error-response>
+		</http:listener>
+		<apikit:router config-ref="customer-system-api-config" />
+		<error-handler>
+			<on-error-propagate type="APIKIT:BAD_REQUEST">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Bad request"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-            <on-error-propagate type="APIKIT:NOT_FOUND">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">400
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate type="APIKIT:NOT_FOUND">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Resource not found"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">404
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate
+				type="APIKIT:METHOD_NOT_ALLOWED">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Method not allowed"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">405
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Not acceptable"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">406
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate
+				type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Unsupported media type"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">415
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Not Implemented"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-        </error-handler>
-    </flow>
-    <flow name="customer-system-api-console">
-        <http:listener config-ref="customer-system-api-httpListenerConfig" path="/console/*">
-            <http:response statusCode="#[vars.httpStatus default 200]">
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
-            </http:response>
-            <http:error-response statusCode="#[vars.httpStatus default 500]">
-                <http:body>#[payload]</http:body>
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
-            </http:error-response>
-        </http:listener>
-        <apikit:console config-ref="customer-system-api-config" />
-        <error-handler>
-            <on-error-propagate type="APIKIT:NOT_FOUND">
-                <ee:transform doc:name="Transform Message">
-                    <ee:message>
-                        <ee:set-payload><![CDATA[%dw 2.0
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">501
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate type="CUSTOMER:NOT_FOUND">
+				<set-variable variableName="httpStatus" value="404" />
+				<set-payload value='{"message":"Customer not found"}' />
+			</on-error-propagate>
+
+			<on-error-propagate type="DB:*">
+				<set-variable variableName="httpStatus" value="500" />
+				<set-payload value='{"message":"Database error"}' />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="customer-system-api-console">
+		<http:listener
+			config-ref="customer-system-api-httpListenerConfig" path="/console/*">
+			<http:response
+				statusCode="#[vars.httpStatus default 200]">
+				<http:headers>#[vars.outboundHeaders default {}]</http:headers>
+			</http:response>
+			<http:error-response
+				statusCode="#[vars.httpStatus default 500]">
+				<http:body>#[payload]</http:body>
+				<http:headers>#[vars.outboundHeaders default {}]</http:headers>
+			</http:error-response>
+		</http:listener>
+		<apikit:console config-ref="customer-system-api-config" />
+		<error-handler>
+			<on-error-propagate type="APIKIT:NOT_FOUND">
+				<ee:transform doc:name="Transform Message">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {message: "Resource not found"}]]></ee:set-payload>
-                    </ee:message>
-                    <ee:variables>
-                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
-                    </ee:variables>
-                </ee:transform>
-            </on-error-propagate>
-        </error-handler>
-    </flow>
-    <flow name="put:\customers\(id):application\json:customer-system-api-config">
-        <ee:transform doc:name="Transform Message">
-            <ee:variables>
-                <ee:set-variable variableName="id">attributes.uriParams.'id'</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <logger level="INFO" message="put:\customers\(id):application\json:customer-system-api-config" />
-    </flow>
-    <flow name="delete:\customers\(id):customer-system-api-config">
-        <ee:transform doc:name="Transform Message">
-            <ee:variables>
-                <ee:set-variable variableName="id">attributes.uriParams.'id'</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <logger level="INFO" message="delete:\customers\(id):customer-system-api-config" />
-    </flow>
-    <flow name="get:\customers:customer-system-api-config">
-        <logger level="INFO" message="get:\customers:customer-system-api-config" />
-    </flow>
-    <flow name="get:\customers\(id):customer-system-api-config">
-        <ee:transform doc:name="Transform Message">
-            <ee:variables>
-                <ee:set-variable variableName="id">attributes.uriParams.'id'</ee:set-variable>
-            </ee:variables>
-        </ee:transform>
-        <logger level="INFO" message="get:\customers\(id):customer-system-api-config" />
-    </flow>
-    <flow name="post:\customers:application\json:customer-system-api-config">
-        <logger level="INFO" message="post:\customers:application\json:customer-system-api-config" />
-    </flow>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus">404
+						</ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="get:\customers:customer-system-api-config">
+
+		<set-variable variableName="email"
+			value="#[attributes.queryParams.email default null]" />
+
+		<set-variable variableName="lastName"
+			value="#[attributes.queryParams.lastName default null]" />
+
+		<db:select config-ref="Postgres_Config">
+
+			<db:sql>
+            <![CDATA[
+            SELECT *
+            FROM customer
+            WHERE
+            (:email IS NULL OR email = :email)
+            AND
+            (:lastName IS NULL OR last_name = :lastName)
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[
+              {
+                email : vars.email,
+                lastName : vars.lastName
+              }
+            ]
+            ]]>
+        </db:input-parameters>
+
+		</db:select>
+
+	</flow>
+	<flow name="get:\customers\(id):customer-system-api-config">
+
+		<set-variable variableName="id"
+			value="#[attributes.uriParams.id]" />
+
+		<db:select config-ref="Postgres_Config">
+
+			<db:sql>
+            <![CDATA[
+            SELECT *
+            FROM customer
+            WHERE id = :id
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[{
+                id : vars.id
+            }]
+            ]]>
+        </db:input-parameters>
+
+		</db:select>
+
+		<choice>
+
+			<when expression="#[isEmpty(payload)]">
+
+				<raise-error type="CUSTOMER:NOT_FOUND"
+					description="Customer not found" />
+
+			</when>
+
+		</choice>
+
+	</flow>
+	<flow
+		name="post:\customers:application\json:customer-system-api-config">
+
+		<db:insert config-ref="Postgres_Config"
+			autoGenerateKeys="true">
+
+			<db:sql>
+            <![CDATA[
+            INSERT INTO customer
+            (
+              first_name,
+              last_name,
+              email,
+              date_of_birth,
+              created_at,
+              updated_at
+            )
+            VALUES
+            (
+              :firstName,
+              :lastName,
+              :email,
+              :dateOfBirth,
+              NOW(),
+              NOW()
+            )
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[
+            {
+                firstName: payload.firstName,
+                lastName: payload.lastName,
+                email: payload.email,
+                dateOfBirth: payload.dateOfBirth
+            }
+            ]
+            ]]>
+        </db:input-parameters>
+
+		</db:insert>
+
+		<set-variable variableName="generatedId"
+			value="#[payload.generatedKeys.id]" />
+
+	</flow>
+	<flow
+		name="put:\customers\(id):application\json:customer-system-api-config">
+
+		<set-variable variableName="id"
+			value="#[attributes.uriParams.id]" />
+
+		<db:update config-ref="Postgres_Config">
+
+			<db:sql>
+            <![CDATA[
+            UPDATE customer
+            SET
+                first_name = :firstName,
+                last_name = :lastName,
+                email = :email,
+                date_of_birth = :dateOfBirth,
+                updated_at = NOW()
+            WHERE id = :id
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[
+            {
+                id: vars.id,
+                firstName: payload.firstName,
+                lastName: payload.lastName,
+                email: payload.email,
+                dateOfBirth: payload.dateOfBirth
+            }
+            ]
+            ]]>
+        </db:input-parameters>
+
+		</db:update>
+
+		<db:select config-ref="Postgres_Config">
+
+			<db:sql>
+            <![CDATA[
+            SELECT *
+            FROM customer
+            WHERE id = :id
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[{
+                id : vars.id
+            }]
+            ]]>
+        </db:input-parameters>
+
+		</db:select>
+
+	</flow>
+	<flow name="delete:\customers\(id):customer-system-api-config">
+
+		<set-variable variableName="id"
+			value="#[attributes.uriParams.id]" />
+
+		<db:delete config-ref="Postgres_Config">
+
+			<db:sql>
+            <![CDATA[
+            DELETE FROM customer
+            WHERE id = :id
+            ]]>
+        </db:sql>
+
+			<db:input-parameters>
+            <![CDATA[
+            #[{
+                id : vars.id
+            }]
+            ]]>
+        </db:input-parameters>
+
+		</db:delete>
+
+		<set-payload
+			value="#[
+{
+    message: 'Customer deleted',
+    id: vars.id
+}
+]" />
+
+	</flow>
 </mule>

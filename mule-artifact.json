@@ -2,5 +2,13 @@
   "minMuleVersion": "4.11.0",
   "javaSpecificationVersions": [
     "17"
-  ]
+  ],
+  "classLoaderModelLoaderDescriptor": {
+    "id": "mule",
+    "attributes": {
+      "exportedPackages": [
+        "org.postgresql"
+      ]
+    }
+  }
 }

@@ -59,6 +59,24 @@
 			<version>1.11.16</version>
 			<classifier>mule-plugin</classifier>
 		</dependency>
+		<!-- POSTGRES DRIVER -->
+		<!-- DB CONNECTOR -->
+		<dependency>
+			<groupId>org.mule.connectors</groupId>
+			<artifactId>mule-db-connector</artifactId>
+			<version>1.14.9</version>
+			<classifier>mule-plugin</classifier>
+		</dependency>
+
+		<!-- POSTGRES DRIVER (CLAVE) -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.7.3</version>
+		</dependency>
+
+
+
 	</dependencies>
 
 	<repositories>
@@ -74,6 +92,7 @@
 			<url>https://repository.mulesoft.org/nexus/repository/releases/</url>
 			<layout>default</layout>
 		</repository>
+
 	</repositories>
 
 	<pluginRepositories>
