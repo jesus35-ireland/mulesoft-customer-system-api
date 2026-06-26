@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+      xmlns:db="http://www.mulesoft.org/schema/mule/db"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- ========================= -->
+    <!-- GLOBAL DB MOCK -->
+    <!-- ========================= -->
+    <munit:before-test>
+        <munit-tools:mock-when processor="db:select">
+            <munit-tools:then-return>
+                <munit-tools:payload value="#[[
+                    {id:1, first_name:'John', last_name:'Doe', email:'john@test.com'}
+                ]]"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="db:insert">
+            <munit-tools:then-return>
+                <munit-tools:payload value="#[{
+                    generatedKeys: {id: 100},
+                    rowsAffected: 1
+                }]"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="db:update">
+            <munit-tools:then-return>
+                <munit-tools:payload value="#[1]"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="db:delete">
+            <munit-tools:then-return>
+                <munit-tools:payload value="#[1]"/>
+            </munit-tools:then-return>
+        </munit-tools:mock-when>
+    </munit:before-test>
+
+    <!-- ===================================================== -->
+    <!-- GET ALL CUSTOMERS -->
+    <!-- ===================================================== -->
+    <munit:test name="get-all-customers">
+        <munit:execution>
+            <set-variable variableName="correlationId" value="test"/>
+            <set-variable variableName="email" value="john@test.com"/>
+            <flow-ref name="get:\customers:customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.success]"
+                                     is="#[MunitTools::equalTo(true)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- GET BY ID SUCCESS -->
+    <!-- ===================================================== -->
+    <munit:test name="get-by-id-success">
+        <munit:execution>
+            <set-variable variableName="id" value="1"/>
+            <flow-ref name="get:\customers\(id):customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.id]"
+                                     is="#[MunitTools::equalTo(1)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- GET BY ID NOT FOUND -->
+    <!-- ===================================================== -->
+    <munit:test name="get-by-id-not-found">
+        <munit:behavior>
+            <munit-tools:mock-when processor="db:select">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[[]]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <set-variable variableName="id" value="999"/>
+            <flow-ref name="get:\customers\(id):customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.message]"
+                                     is="#[MunitTools::equalTo('Customer not found')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- POST CUSTOMER -->
+    <!-- ===================================================== -->
+    <munit:test name="post-customer">
+        <munit:execution>
+            <set-payload value="#[{
+                firstName:'John',
+                lastName:'Doe',
+                email:'john@test.com',
+                dateOfBirth:'1990-01-01'
+            }]"/>
+            <flow-ref name="post:\customers:application\json:customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.id]"
+                                     is="#[MunitTools::equalTo(100)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- PUT SUCCESS -->
+    <!-- ===================================================== -->
+    <munit:test name="put-success">
+        <munit:execution>
+            <set-variable variableName="id" value="1"/>
+            <set-payload value="#[{
+                firstName:'John',
+                lastName:'Doe',
+                email:'john@test.com',
+                dateOfBirth:'1990-01-01'
+            }]"/>
+            <flow-ref name="put:\customers\(id):application\json:customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.rowsAffected]"
+                                     is="#[MunitTools::equalTo(1)]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- PUT NOT FOUND -->
+    <!-- ===================================================== -->
+    <munit:test name="put-not-found">
+        <munit:behavior>
+            <munit-tools:mock-when processor="db:update">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[0]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <set-variable variableName="id" value="999"/>
+            <set-payload value="#[{
+                firstName:'John',
+                lastName:'Doe',
+                email:'john@test.com',
+                dateOfBirth:'1990-01-01'
+            }]"/>
+            <flow-ref name="put:\customers\(id):application\json:customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.message]"
+                                     is="#[MunitTools::equalTo('Customer not found')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- DELETE SUCCESS -->
+    <!-- ===================================================== -->
+    <munit:test name="delete-success">
+        <munit:execution>
+            <set-variable variableName="id" value="1"/>
+            <flow-ref name="delete:\customers\(id):customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]"
+                                     is="#[MunitTools::equalTo('DELETED')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- DELETE NOT FOUND -->
+    <!-- ===================================================== -->
+    <munit:test name="delete-not-found">
+        <munit:behavior>
+            <munit-tools:mock-when processor="db:delete">
+                <munit-tools:then-return>
+                    <munit-tools:payload value="#[0]"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <set-variable variableName="id" value="999"/>
+            <flow-ref name="delete:\customers\(id):customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.status]"
+                                     is="#[MunitTools::equalTo('NOT_FOUND')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- ERROR HANDLER DB:* -->
+    <!-- ===================================================== -->
+    <munit:test name="db-error-handler">
+        <munit:behavior>
+            <munit-tools:mock-when processor="db:select">
+                <munit-tools:then-throw errorType="DB:CONNECTIVITY"/>
+            </munit-tools:mock-when>
+        </munit:behavior>
+
+        <munit:execution>
+            <set-variable variableName="correlationId" value="test"/>
+            <flow-ref name="get:\customers:customer-system-api-config"/>
+        </munit:execution>
+
+        <munit:validation>
+            <munit-tools:assert-that expression="#[payload.message]"
+                                     is="#[MunitTools::equalTo('Internal error')]"/>
+        </munit:validation>
+    </munit:test>
+
+    <!-- ===================================================== -->
+    <!-- SUBFLOW build-error-log -->
+    <!-- ===================================================== -->
+    <munit:test name="build-error-log">
+        <munit:execution>
+            <flow-ref name="build-error-log"/>
+        </munit:execution>
+    </munit:test>
+
+</mule>
