@@ -67,11 +67,10 @@
 			<artifactId>postgresql</artifactId>
 			<version>42.7.3</version>
 		</dependency>
-
 		<dependency>
 			<groupId>38cd32ec-dbaf-4d31-bc6e-25087cbf3c52</groupId>
 			<artifactId>customer-system-api</artifactId>
-			<version>2.0.0</version>
+			<version>3.0.0</version>
 			<classifier>raml</classifier>
 			<type>zip</type>
 		</dependency>
