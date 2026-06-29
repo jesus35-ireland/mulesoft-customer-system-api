@@ -1,13 +1,7 @@
-https:
+http:
   host: "0.0.0.0"
   port: "8083"
-tls:
-  context:
-    keystore:
-      path: "keystore.jks"
-      keyPassword: "changeit"
-      password: "changeit"
-      type: "jks"
+
 db:
   host: "aws-0-eu-west-1.pooler.supabase.com"
   port: "6543"

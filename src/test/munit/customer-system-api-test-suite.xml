@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit" 
+      xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools" 
+      xmlns="http://www.mulesoft.org/schema/mule/core" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:db="http://www.mulesoft.org/schema/mule/db"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+        http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<munit:config name="customer-system-api-test-suite.xml" />
+
+	<!-- ========================================== -->
+	<!-- TEST: MAIN FLOW - SUCCESS (200)           -->
+	<!-- ========================================== -->
+	<munit:test name="main_flow_success_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="apikit:router">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[
+						{
+							message: 'OK'
+						}
+					]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	requestPath: "/api/customers",
+	method: "GET",
+	headers: {
+		"x-correlation-id": "test-correlation-123"
+	}
+}]'/>
+			</munit:set-event>
+			<flow-ref name="customer-system-api-main"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+			<munit-tools:assert-equals expected="#[true]" actual="#[vars.correlationId != null]" />
+			<munit-tools:assert-equals expected="#['OK']" actual="#[payload.message]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+	<!-- TEST: GET ALL CUSTOMERS - SUCCESS (200)   -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_get_all_success_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:select">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[
+						[
+							{ id: 1, first_name: 'John', last_name: 'Doe', email: 'john@test.com' },
+							{ id: 2, first_name: 'Jane', last_name: 'Smith', email: 'jane@test.com' }
+						]
+					]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	queryParams: {
+		email: "john@test.com",
+		lastName: "Doe"
+	},
+	headers: {
+		"x-correlation-id": "test-correlation-123"
+	}
+}]'/>
+			</munit:set-event>
+			<flow-ref name="get:\customers:customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+			<munit-tools:assert-equals expected="#[true]" actual="#[payload.success]" />
+			<munit-tools:assert-equals expected="#[2]" actual="#[sizeOf(payload.data)]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+<!-- TEST: GET BY ID - SUCCESS (200)           -->
+<!-- ========================================== -->
+<munit:test name="subflow_get_by_id_success_test">
+	<munit:behavior>
+		<munit-tools:mock-when processor="db:select">
+			<munit-tools:then-return>
+				<munit-tools:payload value="#[
+					[
+						{ id: 1, first_name: 'John', last_name: 'Doe', email: 'john@test.com' }
+					]
+				]" />
+			</munit-tools:then-return>
+		</munit-tools:mock-when>
+	</munit:behavior>
+
+	<munit:execution>
+		<munit:set-event>
+			<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	uriParams: {
+		id: "1"
+	},
+	headers: {
+		"x-correlation-id": "test-correlation-123"
+	}
+}]'/>
+		</munit:set-event>
+		<flow-ref name="get:\customers\(id):customer-system-api-config"/>
+	</munit:execution>
+
+	<munit:validation>
+		<!-- ✅ Convertir a Number -->
+		<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus as Number]" />
+		<munit-tools:assert-equals expected="#['John']" actual="#[payload.firstName]" />
+		<munit-tools:assert-equals expected="#['Doe']" actual="#[payload.lastName]" />
+	</munit:validation>
+</munit:test>
+	<!-- ========================================== -->
+	<!-- TEST: GET BY ID - NOT FOUND (404)         -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_get_by_id_not_found_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:select">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[
+						[]
+					]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	uriParams: {
+		id: "999"
+	},
+	headers: {
+		"x-correlation-id": "test-correlation-456"
+	}
+}]'/>
+			</munit:set-event>
+			<flow-ref name="get:\customers\(id):customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+			<munit-tools:assert-equals expected="#[false]" actual="#[payload.success]" />
+			<munit-tools:assert-equals expected="#['Customer not found']" actual="#[payload.message]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+	<!-- TEST: POST - SUCCESS (201)                -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_post_success_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:insert">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[
+						{
+							generatedKeys: {
+								id: 10
+							},
+							rowsAffected: 1
+						}
+					]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:payload value="#[
+					{
+						firstName: 'John',
+						lastName: 'Doe',
+						email: 'john@test.com',
+						dateOfBirth: '1990-01-01'
+					}
+				]" />
+				<munit:attributes value="#[
+					{
+						headers: {
+							'X-Correlation-ID': 'test-123'
+						}
+					}
+				]" />
+			</munit:set-event>
+			<flow-ref name="post:\customers:application\json:customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+			<munit-tools:assert-equals expected="#[10]" actual="#[payload.id]" />
+			<munit-tools:assert-equals expected="#[1]" actual="#[payload.rowsAffected]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+<!-- TEST: POST - DB ERROR (500)               -->
+<!-- ========================================== -->
+<munit:test name="subflow_post_db_error_test">
+	<munit:behavior>
+		<!-- ✅ Mockear db:insert para devolver un payload que cause error -->
+		<munit-tools:mock-when processor="db:insert">
+			<munit-tools:then-return>
+				<munit-tools:payload value="#[
+					{
+						error: 'Duplicate key value violates unique constraint'
+					}
+				]" />
+			</munit-tools:then-return>
+		</munit-tools:mock-when>
+	</munit:behavior>
+
+	<munit:execution>
+		<munit:set-event>
+			<munit:payload value="#[
+				{
+					firstName: 'John',
+					lastName: 'Doe',
+					email: 'john@test.com',
+					dateOfBirth: '1990-01-01'
+				}
+			]" />
+			<munit:attributes value="#[
+				{
+					headers: {
+						'X-Correlation-ID': 'test-456'
+					}
+				}
+			]" />
+		</munit:set-event>
+		<flow-ref name="post:\customers:application\json:customer-system-api-config"/>
+	</munit:execution>
+
+	<munit:validation>
+		<!-- ✅ Validar que el payload sea el que esperamos -->
+		<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+		<munit-tools:assert-equals expected="#[null]" actual="#[payload.id]" />
+	</munit:validation>
+</munit:test>
+
+	<!-- ========================================== -->
+	<!-- TEST: PUT - SUCCESS (200)                 -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_put_success_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:update">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[1]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:payload value="#[
+					{
+						firstName: 'John Updated',
+						lastName: 'Doe',
+						email: 'john.updated@test.com',
+						dateOfBirth: '1990-01-01'
+					}
+				]" />
+				<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	uriParams: {
+		id: "1"
+	},
+	headers: {
+		"x-correlation-id": "test-correlation-123"
+	}
+}]'/>
+			</munit:set-event>
+			<flow-ref name="put:\customers\(id):application\json:customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus default 200]" />
+			<munit-tools:assert-equals expected="#[1]" actual="#[payload.rowsAffected]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+<!-- TEST: PUT - NOT FOUND (404)               -->
+<!-- ========================================== -->
+<munit:test name="subflow_put_not_found_test">
+	<munit:behavior>
+		<munit-tools:mock-when processor="db:update">
+			<munit-tools:then-return>
+				<munit-tools:payload value="#[0]" />
+			</munit-tools:then-return>
+		</munit-tools:mock-when>
+	</munit:behavior>
+
+	<munit:execution>
+		<munit:set-event>
+			<munit:payload value="#[
+				{
+					firstName: 'John',
+					lastName: 'Doe',
+					email: 'john@test.com',
+					dateOfBirth: '1990-01-01'
+				}
+			]" />
+			<munit:attributes value='#[%dw 2.0
+output application/java
+---
+{
+	uriParams: {
+		id: "999"
+	},
+	headers: {
+		"x-correlation-id": "test-correlation-456"
+	}
+}]'/>
+		</munit:set-event>
+		<flow-ref name="put:\customers\(id):application\json:customer-system-api-config"/>
+	</munit:execution>
+
+	<munit:validation>
+		<munit-tools:assert-equals expected="#[404]" actual="#[vars.httpStatus as Number]" />
+		<!-- ✅ Usar read() para convertir String a Object -->
+		<munit-tools:assert-equals expected="#['Customer not found']" actual="#[read(payload, 'application/json').message]" />
+	</munit:validation>
+</munit:test>
+
+	<!-- ========================================== -->
+	<!-- TEST: DELETE - SUCCESS (200)              -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_delete_success_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:delete">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[1]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:attributes value="#[
+					{
+						uriParams: {
+							id: '1'
+						},
+						headers: {
+							'x-correlation-id': 'test-123'
+						}
+					}
+				]" />
+			</munit:set-event>
+			<flow-ref name="delete:\customers\(id):customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[200]" actual="#[vars.httpStatus as Number]" />
+			<munit-tools:assert-equals expected="#['DELETED']" actual="#[payload.status]" />
+		</munit:validation>
+	</munit:test>
+
+	<!-- ========================================== -->
+	<!-- TEST: DELETE - NOT FOUND (404)            -->
+	<!-- ========================================== -->
+	<munit:test name="subflow_delete_not_found_test">
+		<munit:behavior>
+			<munit-tools:mock-when processor="db:delete">
+				<munit-tools:then-return>
+					<munit-tools:payload value="#[0]" />
+				</munit-tools:then-return>
+			</munit-tools:mock-when>
+		</munit:behavior>
+
+		<munit:execution>
+			<munit:set-event>
+				<munit:attributes value="#[
+					{
+						uriParams: {
+							id: '999'
+						},
+						headers: {
+							'x-correlation-id': 'test-456'
+						}
+					}
+				]" />
+			</munit:set-event>
+			<flow-ref name="delete:\customers\(id):customer-system-api-config"/>
+		</munit:execution>
+
+		<munit:validation>
+			<munit-tools:assert-equals expected="#[404]" actual="#[vars.httpStatus as Number]" />
+			<munit-tools:assert-equals expected="#['NOT_FOUND']" actual="#[payload.status]" />
+		</munit:validation>
+	</munit:test>
+	
+	
+
+</mule>
